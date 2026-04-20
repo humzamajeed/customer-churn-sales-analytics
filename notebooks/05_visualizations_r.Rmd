@@ -1,0 +1,242 @@
+---
+title: "Phase 6: Advanced Visualizations — Telco Customer Churn"
+author: "Muhammad Humza Majeed"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE,
+                      message = FALSE, fig.align = "center")
+
+library(tidyverse)
+library(plotly)
+library(scales)
+library(patchwork)
+library(knitr)
+library(kableExtra)
+library(RColorBrewer)
+```
+
+## 1. Load Data
+
+```{r load-data}
+df <- read.csv("../data/cleaned/telco_churn_cleaned.csv")
+
+# Quick summary
+cat("Rows:", nrow(df), "| Columns:", ncol(df))
+cat("\nChurn Rate:", round(mean(df$Churn == "Yes") * 100, 2), "%")
+```
+
+## 2. Churn Rate by Contract Type
+
+```{r churn-contract}
+contract_churn <- df %>%
+  group_by(Contract, Churn) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  group_by(Contract) %>%
+  mutate(Percentage = round(Count / sum(Count) * 100, 1))
+
+p1 <- ggplot(contract_churn,
+             aes(x = Churn, y = Percentage, fill = Churn)) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = paste0(Percentage, "%")),
+            vjust = -0.5, size = 3.5, fontface = "bold") +
+  facet_wrap(~ Contract) +
+  scale_fill_manual(values = c("No" = "steelblue", "Yes" = "salmon")) +
+  labs(title = "Churn Rate by Contract Type",
+       subtitle = "Month-to-month contracts have the highest churn",
+       x = "Churn", y = "Percentage (%)") +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"),
+        plot.title = element_text(face = "bold", size = 14))
+
+p1
+ggsave("../outputs/figures/churn_by_contract.png", p1, dpi = 150,
+       width = 10, height = 5)
+```
+
+## 3. Monthly Charges Distribution
+
+```{r monthly-dist}
+p2 <- ggplot(df, aes(x = MonthlyCharges, fill = Churn)) +
+  geom_density(alpha = 0.6) +
+  scale_fill_manual(values = c("No" = "steelblue", "Yes" = "salmon")) +
+  geom_vline(data = df %>% group_by(Churn) %>%
+               summarise(mean_charge = mean(MonthlyCharges)),
+             aes(xintercept = mean_charge, color = Churn),
+             linetype = "dashed", linewidth = 1, show.legend = FALSE) +
+  scale_color_manual(values = c("No" = "darkblue", "Yes" = "darkred")) +
+  labs(title = "Monthly Charges Distribution by Churn",
+       subtitle = "Churned customers tend to have higher monthly charges",
+       x = "Monthly Charges ($)", y = "Density", fill = "Churn") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14))
+
+p2
+ggsave("../outputs/figures/monthly_charges_density.png", p2,
+       dpi = 150, width = 10, height = 5)
+
+```
+## 4. Tenure vs Monthly Charges (Interactive)
+
+```{r scatter-interactive}
+p3 <- ggplot(df, aes(x = tenure, y = MonthlyCharges,
+                      color = Churn,
+                      text = paste("Tenure:", tenure,
+                                   "<br>Monthly:", MonthlyCharges,
+                                   "<br>Contract:", Contract))) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  scale_color_manual(values = c("No" = "steelblue", "Yes" = "salmon")) +
+  labs(title = "Tenure vs Monthly Charges",
+       x = "Tenure (months)", y = "Monthly Charges ($)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+# Make it interactive with plotly
+ggplotly(p3, tooltip = "text") %>%
+  layout(title = list(text = "Tenure vs Monthly Charges",
+                      font = list(size = 14)))
+```
+
+> 💡 Hover over points to see customer details interactively.
+
+## 5. Churn Heatmap
+
+```{r churn-heatmap}
+heatmap_df <- df %>%
+  group_by(InternetService, Contract) %>%
+  summarise(ChurnRate = round(mean(Churn == "Yes") * 100, 1),
+            .groups = "drop")
+
+p4 <- ggplot(heatmap_df,
+             aes(x = Contract, y = InternetService, fill = ChurnRate)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(aes(label = paste0(ChurnRate, "%")),
+            size = 5, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = "steelblue", high = "darkred",
+                      name = "Churn Rate (%)") +
+  labs(title = "Churn Rate Heatmap",
+       subtitle = "By Internet Service Type and Contract",
+       x = "Contract Type", y = "Internet Service") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(angle = 15, hjust = 1))
+
+p4
+ggsave("../outputs/figures/churn_heatmap.png", p4,
+       dpi = 150, width = 9, height = 5)
+```
+
+## 6. Tenure Distribution by Churn
+
+```{r tenure-violin}
+p5 <- ggplot(df, aes(x = Churn, y = tenure, fill = Churn)) +
+  geom_violin(alpha = 0.6, trim = FALSE) +
+  geom_boxplot(width = 0.15, fill = "white",
+               outlier.shape = NA, coef = 0) +
+  scale_fill_manual(values = c("No" = "steelblue", "Yes" = "salmon")) +
+  labs(title = "Tenure Distribution by Churn",
+       subtitle = "Churned customers leave much earlier",
+       x = "Churn", y = "Tenure (months)") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14))
+
+p5
+ggsave("../outputs/figures/tenure_violin.png", p5,
+       dpi = 150, width = 8, height = 5)
+```
+
+## 7. Churn Rate Across Services
+
+```{r lollipop}
+service_cols <- c("PhoneService", "MultipleLines", "OnlineSecurity",
+                  "OnlineBackup", "DeviceProtection", "TechSupport",
+                  "StreamingTV", "StreamingMovies")
+
+service_churn <- sapply(service_cols, function(col) {
+  mean(df$Churn[df[[col]] == "Yes"] == "Yes", na.rm = TRUE) * 100
+})
+
+lollipop_df <- data.frame(
+  Service   = service_cols,
+  ChurnRate = round(service_churn, 1)
+) %>% arrange(ChurnRate)
+
+lollipop_df$Service <- factor(lollipop_df$Service,
+                               levels = lollipop_df$Service)
+
+p6 <- ggplot(lollipop_df, aes(x = Service, y = ChurnRate)) +
+  geom_segment(aes(xend = Service, y = 0, yend = ChurnRate),
+               color = "steelblue", linewidth = 1.2) +
+  geom_point(size = 5, color = "salmon") +
+  geom_text(aes(label = paste0(ChurnRate, "%")),
+            hjust = -0.4, size = 3.5, fontface = "bold") +
+  coord_flip() +
+  ylim(0, max(lollipop_df$ChurnRate) + 10) +
+  labs(title = "Churn Rate by Service Subscription",
+       subtitle = "Customers without online security churn the most",
+       x = NULL, y = "Churn Rate (%)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 14))
+
+p6
+ggsave("../outputs/figures/service_churn_lollipop.png", p6,
+       dpi = 150, width = 9, height = 6)
+```
+
+## 8. Combined Dashboard
+
+```{r dashboard, fig.width=14, fig.height=10}
+dashboard <- (p1 | p2) / (p5 | p4) +
+  plot_annotation(
+    title    = "Customer Churn Analytics Dashboard",
+    subtitle = "Telco Customer Churn — End-to-End Analysis",
+    theme    = theme(
+      plot.title    = element_text(size = 18, face = "bold", hjust = 0.5),
+      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray40")
+    )
+  )
+
+dashboard
+ggsave("../outputs/figures/final_dashboard.png", dashboard,
+       dpi = 150, width = 14, height = 10)
+```
+
+## 9. Key Business Insights
+
+```{r insights-table}
+insights <- data.frame(
+  Finding = c(
+    "Month-to-month churn rate",
+    "Two-year contract churn rate",
+    "Fiber optic customers churn rate",
+    "Customers without online security",
+    "High monthly charges (>$65) churn rate",
+    "Low tenure (<12 months) churn rate"
+  ),
+  Value = c("~42%", "~3%", "~42%", "~45%",
+            "~40%", "~50%"),
+  Business_Action = c(
+    "Offer discounts to switch to annual plans",
+    "Prioritize long-term contract incentives",
+    "Improve fiber service quality & pricing",
+    "Bundle online security into basic plans",
+    "Review high-charge pricing strategy",
+    "Improve onboarding for new customers"
+  )
+)
+
+kable(insights,
+      col.names = c("Finding", "Churn Rate", "Recommended Action"),
+      caption   = "Key Insights & Business Recommendations") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered")) %>%
+  column_spec(3, bold = TRUE, color = "steelblue")
+```
+

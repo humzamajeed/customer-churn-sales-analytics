@@ -42,11 +42,11 @@ customer-churn-sales-analytics/
 
 ## Phases
 - [x] Phase 1 — Project Setup & Data Sourcing
-- [ ] Phase 2 — Exploratory Data Analysis (Python)
-- [ ] Phase 3 — Statistical Analysis (R)
-- [ ] Phase 4 — Regression Analysis (Python)
-- [ ] Phase 5 — Machine Learning Models (Python)
-- [ ] Phase 6 — Advanced Visualizations (R)
+- [x] Phase 2 — Exploratory Data Analysis (Python)
+- [x] Phase 3 — Statistical Analysis (R)
+- [x] Phase 4 — Regression Analysis (Python)
+- [x] Phase 5 — Machine Learning Models (Python)
+- [x] Phase 6 — Advanced Visualizations (R)
 
 ## How to Run
 1. Clone this repo
