@@ -1,0 +1,3 @@
+Model,Target,Key Metric,Score
+Linear Regression,MonthlyCharges,R² Score,0.9988
+Logistic Regression,Churn,ROC-AUC,0.8333
