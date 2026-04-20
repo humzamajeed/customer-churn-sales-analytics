@@ -3,11 +3,16 @@ title: "Phase 6: Advanced Visualizations — Telco Customer Churn"
 author: "Muhammad Humza Majeed"
 date: "`r Sys.Date()`"
 output:
-  html_document:
-    theme: flatly
+  github_document:
     toc: true
-    toc_float: true
-    code_folding: hide
+    toc_depth: 2
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.path = "figures/",          # ← ADD THIS
+  fig.align = "center"
+)    
 ---
 
 ```{r setup, include=FALSE}
@@ -86,6 +91,19 @@ ggsave("../outputs/figures/monthly_charges_density.png", p2,
 ## 4. Tenure vs Monthly Charges (Interactive)
 
 ```{r scatter-interactive}
+p3 <- ggplot(df, aes(x = tenure, y = MonthlyCharges, color = Churn)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  scale_color_manual(values = c("No" = "steelblue", "Yes" = "salmon")) +
+  labs(title = "Tenure vs Monthly Charges by Churn",
+       x = "Tenure (months)", y = "Monthly Charges ($)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+p3
+ggsave("../outputs/figures/tenure_vs_monthly.png", p3,
+       dpi = 150, width = 10, height = 5)
+```
+
 p3 <- ggplot(df, aes(x = tenure, y = MonthlyCharges,
                       color = Churn,
                       text = paste("Tenure:", tenure,
@@ -102,9 +120,10 @@ p3 <- ggplot(df, aes(x = tenure, y = MonthlyCharges,
 ggplotly(p3, tooltip = "text") %>%
   layout(title = list(text = "Tenure vs Monthly Charges",
                       font = list(size = 14)))
-```
 
 > 💡 Hover over points to see customer details interactively.
+
+
 
 ## 5. Churn Heatmap
 
@@ -240,3 +259,7 @@ kable(insights,
   column_spec(3, bold = TRUE, color = "steelblue")
 ```
 
+```
+
+
+```

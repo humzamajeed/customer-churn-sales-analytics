@@ -3,10 +3,9 @@ title: "Phase 3: Statistical Analysis — Telco Customer Churn"
 author: "Muhammad Humza Majeed"
 date: "`r Sys.Date()`"
 output:
-  html_document:
-    theme: cosmo
-    highlight: tango
-    self_contained: true
+ github_document:
+    toc: true
+    toc_depth: 2
 ---
 
 ```{r setup, include=FALSE}
