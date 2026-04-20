@@ -1,0 +1,215 @@
+---
+title: "Phase 3: Statistical Analysis — Telco Customer Churn"
+author: "Muhammad Humza Majeed"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: cosmo
+    highlight: tango
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+library(infer)
+library(knitr)
+library(kableExtra)
+```
+## 1. Load Data
+
+```{r load-data}
+df <- read.csv("../data/cleaned/telco_churn_cleaned.csv")
+
+# Quick look
+glimpse(df)
+cat("Rows:", nrow(df), "| Columns:", ncol(df))
+```
+
+## 2. Descriptive Statistics by Churn Group
+
+```{r descriptive-stats}
+df %>%
+  group_by(Churn) %>%
+  summarise(
+    Count         = n(),
+    Avg_Tenure    = round(mean(tenure), 2),
+    Avg_Monthly   = round(mean(MonthlyCharges), 2),
+    Avg_Total     = round(mean(TotalCharges), 2),
+    SD_Monthly    = round(sd(MonthlyCharges), 2)
+  ) %>%
+  kable(caption = "Descriptive Statistics by Churn") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+## 3. Hypothesis Test 1: T-Test — Tenure by Churn
+
+**H₀:** Mean tenure is the same for churned and non-churned customers  
+**H₁:** Churned customers have significantly lower tenure
+
+```{r ttest-tenure}
+# Run the t-test
+t_result <- df %>%
+  t_test(tenure ~ Churn, alternative = "two.sided") %>%
+  add_significance()
+
+print(t_result)
+
+# Visualize
+ggboxplot(df, x = "Churn", y = "tenure",
+          color = "Churn", palette = c("steelblue", "salmon"),
+          add = "mean_ci",
+          title = "Tenure by Churn Status",
+          xlab = "Churn", ylab = "Tenure (months)") +
+  stat_compare_means(method = "t.test", label.y = 75)
+```
+
+**Interpretation:** If p-value < 0.05, we reject H₀ — churned customers 
+have significantly different tenure.
+
+## 4. Hypothesis Test 2: T-Test — Monthly Charges by Churn
+
+**H₀:** Mean MonthlyCharges is the same for both groups  
+**H₁:** Churned customers pay significantly higher monthly charges
+
+```{r ttest-monthly}
+t_result2 <- df %>%
+  t_test(MonthlyCharges ~ Churn, alternative = "two.sided") %>%
+  add_significance()
+
+print(t_result2)
+
+# Visualize
+ggboxplot(df, x = "Churn", y = "MonthlyCharges",
+          color = "Churn", palette = c("steelblue", "salmon"),
+          add = "mean_ci",
+          title = "Monthly Charges by Churn Status",
+          xlab = "Churn", ylab = "Monthly Charges ($)") +
+  stat_compare_means(method = "t.test", label.y = 120)
+```
+## 5. Hypothesis Test 3: Chi-Square — Churn vs Contract Type
+
+**H₀:** Churn is independent of Contract type  
+**H₁:** There is a significant association between Churn and Contract type
+
+```{r chisq-contract}
+# Contingency table
+contract_table <- table(df$Contract, df$Churn)
+print(contract_table)
+
+# Chi-square test
+chisq_result <- chisq.test(contract_table)
+print(chisq_result)
+
+# Visualize
+df %>%
+  group_by(Contract, Churn) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  group_by(Contract) %>%
+  mutate(Percentage = Count / sum(Count) * 100) %>%
+  filter(Churn == "Yes") %>%
+  ggplot(aes(x = Contract, y = Percentage, fill = Contract)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = c("coral", "steelblue", "seagreen")) +
+  labs(title = "Churn Rate by Contract Type",
+       x = "Contract Type", y = "Churn Rate (%)") +
+  theme_minimal()
+```
+
+**Interpretation:** If p-value < 0.05, contract type significantly 
+affects whether a customer churns.
+
+## 6. Hypothesis Test 4: Chi-Square — Churn vs Payment Method
+
+```{r chisq-payment}
+payment_table <- table(df$PaymentMethod, df$Churn)
+chisq_payment <- chisq.test(payment_table)
+print(chisq_payment)
+
+# Visualize
+df %>%
+  group_by(PaymentMethod, Churn) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  group_by(PaymentMethod) %>%
+  mutate(Percentage = Count / sum(Count) * 100) %>%
+  filter(Churn == "Yes") %>%
+  ggplot(aes(x = reorder(PaymentMethod, -Percentage), 
+             y = Percentage, fill = PaymentMethod)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Churn Rate by Payment Method",
+       x = "Payment Method", y = "Churn Rate (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+```
+
+## 7. Confidence Intervals — Monthly Charges by Churn Group
+
+```{r confidence-intervals}
+ci_results <- df %>%
+  group_by(Churn) %>%
+  summarise(
+    Mean  = mean(MonthlyCharges),
+    SE    = sd(MonthlyCharges) / sqrt(n()),
+    Lower = Mean - 1.96 * SE,
+    Upper = Mean + 1.96 * SE
+  )
+
+print(ci_results)
+
+# Visualize CI
+ggplot(ci_results, aes(x = Churn, y = Mean, color = Churn)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, size = 1.2) +
+  scale_color_manual(values = c("steelblue", "salmon")) +
+  labs(title = "95% Confidence Intervals for Monthly Charges",
+       x = "Churn", y = "Monthly Charges ($)") +
+  theme_minimal()
+```
+
+## 8. Statistical Test Summary
+
+```{r summary-table}
+# T-test for Tenure
+t_result <- t.test(tenure ~ Churn, data = df)
+
+# T-test for Monthly Charges
+t_result2 <- t.test(MonthlyCharges ~ Churn, data = df)
+
+# Chi-Square tests
+chisq_result <- chisq.test(table(df$Churn, df$Contract))
+chisq_payment <- chisq.test(table(df$Churn, df$PaymentMethod))
+## 8. Statistical Test Summary
+# Create the data frame with corrected p-value references
+summary_df <- data.frame(
+  Test = c(
+    "T-Test: Tenure vs Churn",
+    "T-Test: MonthlyCharges vs Churn",
+    "Chi-Square: Churn vs Contract",
+    "Chi-Square: Churn vs PaymentMethod"
+  ),
+  Method = c("Independent t-test", "Independent t-test",
+             "Chi-Square", "Chi-Square"),
+  P_Value = c(
+    format.pval(t_result$p.value, eps = .0001, digits = 4),
+    format.pval(t_result2$p.value, eps = .0001, digits = 4),
+    format.pval(chisq_result$p.value, eps = .0001, digits = 4),
+    format.pval(chisq_payment$p.value, eps = .0001, digits = 4)
+  ),
+  Significant = ifelse(
+    c(t_result$p.value, t_result2$p.value, 
+      chisq_result$p.value, chisq_payment$p.value) < 0.05,
+    "Yes ✅", "No ❌"
+  )
+)
+
+# Render the table
+library(knitr)
+library(kableExtra)
+
+kable(summary_df, caption = "Summary of Hypothesis Tests") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "bordered"))
+```
